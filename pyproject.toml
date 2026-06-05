@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ctx-worker-shared"
+version = "1.0.0"
+description = "Shared library for ContextKraft v1 Celery workers (storage, db session, contracts, adapters)."
+requires-python = ">=3.10"
+dependencies = [
+    "sqlalchemy>=2.0,<3.0",
+    "psycopg2-binary>=2.9,<3.0",
+    "fsspec>=2024.10.0",
+    "requests>=2.31,<3.0",
+    "python-dotenv>=1.0,<2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ctx_worker_shared = ["py.typed"]
