@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ctx-worker-shared"
-version = "1.0.0"
-description = "Shared library for ContextKraft v1 Celery workers (storage, db session, contracts, adapters)."
+version = "1.1.0"
+description = "Shared library for ContextKraft v1 Celery workers (storage, db session, contracts)."
 requires-python = ">=3.10"
 dependencies = [
     "sqlalchemy>=2.0,<3.0",
