@@ -9,4 +9,4 @@ modules used by workers: ``storage``, ``db_session``, ``contract_validator``,
 shape conversions flow through explicit format_adapter nodes on the canvas.)
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
