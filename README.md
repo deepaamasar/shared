@@ -1,6 +1,6 @@
 # ctx_worker_shared
 
-Shared library for ContextKraft **v1** Celery workers. Packaged from the former
+Shared library for ContextBuilder **v1** Celery workers. Packaged from the former
 `workers/shared` monorepo folder so each worker repo can install it from a
 **local wheel** — no git clone and no package index at deploy time.
 

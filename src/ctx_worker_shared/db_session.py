@@ -116,7 +116,7 @@ def _resolve_profile_decrypt_url() -> str:
     if worker_results_url:
         base = worker_results_url.split("/", 3)
         if len(base) >= 3:
-            return f"{base[0]}//{base[2]}/rbac/decryptConnectionProfile"
+            return f"{base[0]}//{base[2]}/internal/connection-profiles/decrypt"
 
     raise RuntimeError(
         "PROFILE_DECRYPT_URL not set and could not be derived from WORKER_RESULTS_URL"

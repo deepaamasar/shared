@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ctx-worker-shared"
-version = "1.2.0"
-description = "Shared library for ContextKraft v1 Celery workers (storage, db session, contracts)."
+version = "1.4.1"
+description = "Shared library for ContextBuilder v1 Celery workers (storage, db session, contracts, telemetry)."
 requires-python = ">=3.10"
 dependencies = [
     "sqlalchemy>=2.0,<3.0",
@@ -13,6 +13,15 @@ dependencies = [
     "fsspec>=2024.10.0",
     "requests>=2.31,<3.0",
     "python-dotenv>=1.0,<2.0",
+    # OTEL telemetry bootstrap (telemetry.py). Pinned to ONE version across the
+    # whole platform (matches backend/requirements.txt) — the bootstrap imports
+    # the logs SDK whose API shifted between minors; drift would silently disable
+    # telemetry since init_telemetry is non-fatal.
+    "opentelemetry-api==1.27.0",
+    "opentelemetry-sdk==1.27.0",
+    "opentelemetry-exporter-otlp==1.27.0",
+    "opentelemetry-instrumentation-requests==0.48b0",
+    "opentelemetry-instrumentation-celery==0.48b0",
 ]
 
 [tool.setuptools.packages.find]
