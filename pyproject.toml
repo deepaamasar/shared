@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ctx-worker-shared"
-version = "1.4.1"
+version = "1.5.1"
 description = "Shared library for ContextBuilder v1 Celery workers (storage, db session, contracts, telemetry)."
 requires-python = ">=3.10"
 dependencies = [
@@ -29,3 +29,17 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 ctx_worker_shared = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "ac(id): ties a test to a spec acceptance criterion, e.g. @pytest.mark.ac(\"FINOPS-AC-2\")",
+]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+# Minimal on purpose (Rung 1): syntax errors + pyflakes only — never block on
+# legacy style. Widen deliberately, not by default.
+select = ["E9", "F"]

@@ -27,6 +27,7 @@ Env read:
 from __future__ import annotations
 
 import atexit
+import json
 import logging
 import os
 import re
@@ -100,6 +101,44 @@ class _BridgeExcludeFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
         name = record.name or ""
         return not name.startswith(_BRIDGE_EXCLUDE_PREFIXES)
+
+
+# Standard LogRecord attribute names — everything beyond these is a caller
+# "extra" that the OTLP LoggingHandler maps into log attributes.
+_LOGREC_STANDARD = frozenset(
+    vars(logging.LogRecord("", 0, "", 0, "", (), None)).keys()
+) | {"message", "asctime", "taskName"}
+
+_ATTR_PRIMITIVES = (bool, str, bytes, int, float)
+_ATTR_MAX_LEN = 2048
+
+
+class _AttributeSanitizerFilter(logging.Filter):
+    """Serialize non-primitive log extras before the OTLP handler maps them.
+
+    OTEL log attributes accept only bool/str/bytes/int/float (or sequences of
+    those). Third-party libraries attach richer extras — most notably Celery,
+    whose task-completion logs carry ``extra={'data': <context dict>}``
+    (celery/app/trace.py), producing an "Invalid type dict for attribute
+    'data'" warning on EVERY task completion. Rewrite offending values to
+    compact JSON strings so the data survives and the noise stops.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        for key, value in list(record.__dict__.items()):
+            if key in _LOGREC_STANDARD or value is None:
+                continue
+            if isinstance(value, _ATTR_PRIMITIVES):
+                continue
+            if isinstance(value, (list, tuple)) and all(
+                isinstance(v, _ATTR_PRIMITIVES) for v in value
+            ):
+                continue
+            try:
+                record.__dict__[key] = json.dumps(value, default=str)[:_ATTR_MAX_LEN]
+            except Exception:  # noqa: BLE001 — sanitizing must never break logging
+                record.__dict__[key] = str(value)[:_ATTR_MAX_LEN]
+        return True
 
 
 # --------------------------------------------------------------------------- #
@@ -192,6 +231,7 @@ def _setup_logging(resource, endpoint: str, insecure: bool, timeout: int) -> Non
     handler = LoggingHandler(level=level, logger_provider=provider)
     handler.addFilter(_ContextEnrichmentFilter())
     handler.addFilter(_BridgeExcludeFilter())  # feedback-loop guard
+    handler.addFilter(_AttributeSanitizerFilter())  # celery 'data' dict etc.
 
     _providers["logger"] = provider
     _providers["log_handler"] = handler
