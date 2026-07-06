@@ -114,19 +114,36 @@ _ATTR_MAX_LEN = 2048
 
 
 class _AttributeSanitizerFilter(logging.Filter):
-    """Serialize non-primitive log extras before the OTLP handler maps them.
+    """Sanitize non-primitive log extras before the OTLP handler maps them.
 
     OTEL log attributes accept only bool/str/bytes/int/float (or sequences of
-    those). Third-party libraries attach richer extras — most notably Celery,
-    whose task-completion logs carry ``extra={'data': <context dict>}``
-    (celery/app/trace.py), producing an "Invalid type dict for attribute
-    'data'" warning on EVERY task completion. Rewrite offending values to
-    compact JSON strings so the data survives and the noise stops.
+    those). Anything else on a LogRecord's ``__dict__`` gets rejected by the
+    OTLP LoggingHandler with a warning, and the attribute is dropped.
+
+    Two common leaks this filter neutralises:
+
+    - Dict/list values: e.g. Celery's task-completion logs carry
+      ``extra={'data': <context dict>}`` (celery/app/trace.py). Rewrite to a
+      bounded JSON string so the data survives and the noise stops.
+
+    - ``None`` values: ``_ContextEnrichmentFilter`` and ``log_event`` can leave
+      ``step_name``/``run_id``/``folder_id`` explicitly set to ``None`` on the
+      record when the contextvar is empty. OTEL rejects None, warns every log
+      line ("Invalid type NoneType for attribute 'step_name' value"). Strip
+      explicit-None non-standard extras so the record just doesn't carry them.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
         for key, value in list(record.__dict__.items()):
-            if key in _LOGREC_STANDARD or value is None:
+            if key in _LOGREC_STANDARD:
+                continue
+            if value is None:
+                # OTEL rejects None-valued attributes. Drop the key entirely —
+                # cleaner than shipping "None" strings.
+                try:
+                    del record.__dict__[key]
+                except Exception:  # noqa: BLE001
+                    pass
                 continue
             if isinstance(value, _ATTR_PRIMITIVES):
                 continue

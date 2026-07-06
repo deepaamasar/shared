@@ -31,7 +31,7 @@ dependency.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 CHARGE_CATEGORIES = (
     "llm", "embedding", "ocr", "external_api", "compute", "storage", "vector_db",
@@ -49,6 +49,18 @@ def estimate_tokens(text: Optional[str]) -> int:
     return max(1, len(text) // _CHARS_PER_TOKEN)
 
 
+def resolve_embedding_tokens(measured: Optional[int], text: Optional[str]) -> Tuple[int, bool]:
+    """Embedding input_tokens, measured-or-estimated (FINOPS-AC-21 / AC-6).
+
+    Returns ``(tokens, estimated)``: the provider-reported ``measured`` count when
+    present and positive (e.g. Ollama ``/api/embed`` ``prompt_eval_count``, Bedrock
+    Titan), otherwise ``estimate_tokens(text)`` flagged ``estimated=True``. The token
+    quantity is never omitted."""
+    if measured:
+        return int(measured), False
+    return estimate_tokens(text), True
+
+
 def build_usage_item(
     *,
     charge_category: str,
@@ -58,6 +70,7 @@ def build_usage_item(
     estimated: bool = False,
     folder_id: Optional[str] = None,
     connection_id: Optional[str] = None,
+    connection_profile_name: Optional[str] = None,
     node_id: Optional[str] = None,
     attributes: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -85,6 +98,10 @@ def build_usage_item(
         item["folder_id"] = str(folder_id)
     if connection_id:
         item["connection_id"] = str(connection_id)
+    if connection_profile_name:
+        # Backend resolves this to connection_id at capture time (FINOPS-AC-20 L0);
+        # the worker only knows the profile name it was dispatched with.
+        item["connection_profile_name"] = str(connection_profile_name)
     if node_id:
         item["node_id"] = str(node_id)
     if attributes:

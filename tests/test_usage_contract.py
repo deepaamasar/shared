@@ -21,6 +21,7 @@ from ctx_worker_shared.usage import (
     embedding_usage,
     estimate_tokens,
     extract_token_usage,
+    resolve_embedding_tokens,
     llm_usage_from_response,
     ocr_usage,
 )
@@ -122,6 +123,23 @@ class TestBuildersAndValidation:
         item = embedding_usage(provider_name="aws_bedrock", model="titan-v2",
                                vectors=256, tokens=4096)
         assert item["quantity"] == {"vectors": 256, "input_tokens": 4096}
+
+    # FINOPS-AC-21: embedding token capture — measured when the provider reports it,
+    # else estimated + flagged; the token quantity is NEVER omitted.
+    def test_resolve_embedding_tokens_measured(self):
+        tokens, estimated = resolve_embedding_tokens(measured=42, text="anything")
+        assert tokens == 42 and estimated is False
+
+    def test_resolve_embedding_tokens_estimates_when_absent(self):
+        # Ollama's legacy /api/embeddings returns no token count → estimate, flag it.
+        tokens, estimated = resolve_embedding_tokens(measured=None, text="hello world of embeddings")
+        assert tokens == estimate_tokens("hello world of embeddings")
+        assert tokens > 0 and estimated is True
+
+    def test_resolve_embedding_tokens_never_omits(self):
+        # Zero/None measured with real text still yields a positive estimate (AC-21/AC-6).
+        tokens, estimated = resolve_embedding_tokens(measured=0, text="some chunk text")
+        assert tokens > 0 and estimated is True
 
     def test_invalid_items_raise(self):
         with pytest.raises(ValueError):
