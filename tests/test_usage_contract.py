@@ -124,6 +124,21 @@ class TestBuildersAndValidation:
                                vectors=256, tokens=4096)
         assert item["quantity"] == {"vectors": 256, "input_tokens": 4096}
 
+    # FINOPS-AC-20 (v6): the connection snapshot the backend groups by comes from the
+    # `connection_profile_name` the emitting worker attaches — every connection-using
+    # metering worker (vectorize, semantic-chunking embedding, awstextract parser)
+    # forwards it through these builders, so by-connection reflects TOTAL spend, not one
+    # step. Absent ⇒ omitted (optional), never a null that shadows a real name.
+    @pytest.mark.ac("FINOPS-AC-20")
+    def test_builders_forward_connection_profile_name(self):
+        emb = embedding_usage(provider_name="ollama", vectors=3,
+                              connection_profile_name="my-embed-conn")
+        assert emb["connection_profile_name"] == "my-embed-conn"
+        ocr = ocr_usage(provider_name="aws_textract", pages=2,
+                        connection_profile_name="my-parser-conn")
+        assert ocr["connection_profile_name"] == "my-parser-conn"
+        assert "connection_profile_name" not in embedding_usage(provider_name="ollama", vectors=1)
+
     # FINOPS-AC-21: embedding token capture — measured when the provider reports it,
     # else estimated + flagged; the token quantity is NEVER omitted.
     def test_resolve_embedding_tokens_measured(self):
