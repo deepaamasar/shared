@@ -14,7 +14,7 @@ Celery task with ``@with_capability(CAPABILITY_SCHEMA)``. The decorator:
 
 Usage:
 
-    from workers.shared.worker_base import with_capability
+    from ctx_worker_shared.worker_base import with_capability
 
     CAPABILITY_SCHEMA = {
         "worker": "tesseract",
@@ -43,12 +43,12 @@ import logging
 from functools import wraps
 from typing import Any, Callable, Dict
 
-from workers.shared.contract_validator import (
+from .contract_validator import (
     validate_capability_input,
     validate_capability_output,
 )
-from workers.shared.db_session import get_blob_storage_uri, get_db_url, get_session_factory, get_worker_session
-from workers.shared.storage import StorageClient
+from .db_session import get_blob_storage_uri, get_db_url, get_session_factory, get_worker_session
+from .storage import StorageClient
 
 logger = logging.getLogger(__name__)
 

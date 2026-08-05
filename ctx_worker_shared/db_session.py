@@ -116,7 +116,7 @@ def _resolve_profile_decrypt_url() -> str:
     if worker_results_url:
         base = worker_results_url.split("/", 3)
         if len(base) >= 3:
-            return f"{base[0]}//{base[2]}/rbac/decryptConnectionProfile"
+            return f"{base[0]}//{base[2]}/internal/connection-profiles/decrypt"
 
     raise RuntimeError(
         "PROFILE_DECRYPT_URL not set and could not be derived from WORKER_RESULTS_URL"
@@ -126,7 +126,15 @@ def _resolve_profile_decrypt_url() -> str:
 def _decrypt_postgres_profile(profile_name: str) -> str:
     url = _resolve_profile_decrypt_url()
     try:
-        resp = requests.post(url, json={"profile_name": profile_name}, timeout=30)
+        # Require the profile to be categorized as the system database. The
+        # backend rejects (403) a profile of any other category (e.g. a
+        # chunk_store postgres profile), so the system DB can't be resolved from
+        # the wrong connection.
+        resp = requests.post(
+            url,
+            json={"profile_name": profile_name, "expected_category": "system_database"},
+            timeout=30,
+        )
     except Exception as exc:
         raise RuntimeError(f"Failed to call decryptConnectionProfile at {url}: {exc}") from exc
 

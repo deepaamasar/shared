@@ -90,8 +90,10 @@ CREATE TABLE IF NOT EXISTS public.parser_page (
     source JSONB NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT parser_page_uniq UNIQUE (folder_id, page_number),
-    CONSTRAINT parser_page_stage_valid CHECK (stage IN ('raw', 'cleaned'))
+    CONSTRAINT parser_page_uniq UNIQUE (folder_id, page_number, stage),
+    CONSTRAINT parser_page_stage_valid CHECK (
+        stage IN ('raw', 'cleaned') OR stage ~ '^branch_[a-z][a-z0-9_]*$'
+    )
 );
 CREATE INDEX IF NOT EXISTS idx_parser_page_folder_stage
     ON public.parser_page (folder_id, stage);
@@ -443,7 +445,11 @@ class StorageClient:
         pages: List[Dict[str, Any]],
         stage: str = "raw",
     ) -> int:
-        """UPSERT one row per page into parser_page (idempotent on (folder_id, page_number)).
+        """UPSERT one row per page into parser_page (idempotent on (folder_id,
+        page_number, stage) -- ADR-0005/specs/parsing v10: `stage` is part of
+        the conflict target, not just a status flag, so a branch-tagged
+        writer never collides with the canonical 'raw'/'cleaned' row for the
+        same page).
 
         Each dict in ``pages``:
           page_number : int            (required)
@@ -471,9 +477,8 @@ class StorageClient:
                     INSERT INTO public.parser_page
                         (folder_id, page_number, elements, stage, source)
                     VALUES %s
-                    ON CONFLICT (folder_id, page_number) DO UPDATE SET
+                    ON CONFLICT (folder_id, page_number, stage) DO UPDATE SET
                         elements   = EXCLUDED.elements,
-                        stage      = EXCLUDED.stage,
                         source     = EXCLUDED.source,
                         updated_at = NOW()
                 """, rows, page_size=200)
@@ -542,17 +547,52 @@ class StorageClient:
                 result.append({**el, "page": row["page_number"]})
         return result
 
+    def read_parser_page_rows_all_stages(
+        self,
+        folder_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Read EVERY parser_page row for a folder, across every stage (ADR-0005,
+        specs/parsing v10) -- deliberately stage-unfiltered, unlike
+        read_parser_elements_from_pages. The only consumer is a decomposed-mode
+        assembler correlating a canonical 'raw' page against any 'branch_*'
+        rows written for the same page_number; every other consumer keeps
+        reading a single stage via read_parser_elements_from_pages.
+
+        Returns one dict per row: {"page_number": int, "stage": str,
+        "elements": list[dict]}, ordered by (page_number, stage). No legacy-
+        table fallback -- an empty return here is a real signal (zero
+        parser_page rows exist for this folder), not a rollout-transition
+        case; the caller's own empty-input contract decides what that means.
+        """
+        sql = """
+            SELECT page_number, stage, elements
+              FROM public.parser_page
+             WHERE folder_id = :folder_id
+             ORDER BY page_number, stage
+        """
+        with self._db_session() as _db:
+            rows = _db.execute(text(sql), {"folder_id": folder_id}).mappings().all()
+        return [
+            {"page_number": row["page_number"], "stage": row["stage"], "elements": row["elements"] or []}
+            for row in rows
+        ]
+
     def count_parser_pages(
         self,
         folder_id: str,
         stage: Optional[str] = None,
     ) -> int:
-        """Return the number of parser_page rows for a folder (no element deserialization).
+        """Return the number of DISTINCT pages for a folder (no element deserialization).
 
-        Used for artifact handle metadata and data_source assertions.
+        Used for artifact handle metadata and data_source assertions. Counts
+        distinct page_number, not total rows: since ADR-0005 (specs/parsing
+        v10), a page can carry more than one parser_page row at once (a
+        canonical 'raw'/'cleaned' row plus any 'branch_*' rows a decomposed-
+        mode specialist wrote) -- a plain COUNT(*) would over-count pages the
+        instant a branch row and the canonical row coexist for the same page.
         """
         sql = """
-            SELECT COUNT(*) AS n
+            SELECT COUNT(DISTINCT page_number) AS n
               FROM public.parser_page
              WHERE folder_id = :folder_id
         """

@@ -1,7 +1,7 @@
 """
 Data Contract Runtime Validator
 ================================
-Shared module for enforcing Data Contract compliance in ContextCraft workers.
+Shared module for enforcing Data Contract compliance in ContextBuilder workers.
 
 Each Celery worker CAN validate its task input and output payloads against the
 central ``data_contract_registry`` in real-time.
