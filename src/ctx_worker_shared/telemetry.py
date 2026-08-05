@@ -184,6 +184,11 @@ def log_event(lgr: logging.Logger, level: int, event: str, *,
         )
     suffix = " ".join(f"{k}={v}" for k, v in fields.items())
     body = f"{event} {suffix}".rstrip()
+    if exc is not None:
+        # Surface the exception type + message on the console body too — the full
+        # stacktrace stays in ``extra`` for the OTLP sink (RCA 2026-08-03: a bare
+        # ``event action=fail`` line hid the real error from stdout).
+        body = f"{body} exception={type(exc).__name__}: {exc}".rstrip()
     lgr.log(level, body, extra=extra)
 
 
