@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ctx-worker-shared"
-version = "1.6.1"
+version = "1.6.2"
 description = "Shared library for ContextBuilder v1 Celery workers (storage, db session, contracts, telemetry)."
 requires-python = ">=3.10"
 dependencies = [
