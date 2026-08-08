@@ -271,6 +271,18 @@ def validate_capability_input(
                 f"Worker '{worker_name}' requires field '{field_name}' (always required) — not present in payload"
             )
 
+        # Declared allowed values (specs/capability-schema v1, CAPSCH-AC-2):
+        # a field carrying `allowed` accepts only listed values. Absent/None
+        # values are not membership-checked; fields without `allowed` are
+        # untouched (CAPSCH-AC-3).
+        allowed = field_spec.get("allowed")
+        if allowed and payload.get(field_name) is not None:
+            if payload[field_name] not in allowed:
+                errors.append(
+                    f"Worker '{worker_name}' field '{field_name}': "
+                    f"{payload[field_name]!r} not one of {allowed}"
+                )
+
     is_valid = len(errors) == 0
     if not is_valid:
         summary = f"CAPABILITY_INPUT FAILED [{worker_name}]: " + "; ".join(errors)

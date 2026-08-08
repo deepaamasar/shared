@@ -9,4 +9,5 @@ modules used by workers: ``storage``, ``db_session``, ``contract_validator``,
 shape conversions flow through explicit format_adapter nodes on the canvas.)
 """
 
-__version__ = "1.4.1"
+__version__ = "1.7.0"  # keep in step with pyproject.toml — a stale value here is how
+                       # "which build am I running?" became unanswerable (2026-08-08)
